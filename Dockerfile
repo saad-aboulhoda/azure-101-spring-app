@@ -1,19 +1,19 @@
-FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+FROM eclipse-temurin:21 AS builder
+
+WORKDIR /builder
+
+ARG JAR_FILE=target/*.jar
+COPY ${JAR_FILE} app.jar
+
+RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
+
+FROM eclipse-temurin:21
 
 WORKDIR /app
 
-COPY pom.xml .
-RUN mvn -B -q -e -C -DskipTests dependency:go-offline
+COPY --from=builder /builder/extracted/dependencies/ ./
+COPY --from=builder /builder/extracted/spring-boot-loader/ ./
+COPY --from=builder /builder/extracted/snapshot-dependencies/ ./
+COPY --from=builder /builder/extracted/application/ ./
 
-COPY src ./src
-
-RUN mvn clean package -DskipTests
-FROM eclipse-temurin:21-jdk-alpine
-
-WORKDIR /app
-
-COPY --from=builder /app/target/*.jar app.jar
-
-EXPOSE 8080
-
-ENTRYPOINT ["java","-jar","app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
